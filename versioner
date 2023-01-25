@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+
+bump=""
+file="${VERSIONER_FILE:=.version}"
+append=""
+init_version="${VERSIONER_INIT_VERSION:=0.0.0}"
+
+prepare_bump() {
+	if [[ "$bump" != "" ]]; then
+		echo 1>&2 "Error: can't bump version in multiple places"
+		exit 1
+	fi
+	bump="$1"
+}
+
+while getopts hpmMf:a:i: opt; do
+	case "$opt" in
+	p)
+		prepare_bump patch
+		;;
+	m)
+		prepare_bump minor
+		;;
+	M)
+		prepare_bump major
+		;;
+	f)
+		file="$OPTARG"
+		;;
+	a)
+		append="$OPTARG"
+		;;
+	i)
+		init_version="$OPTARG"
+		;;
+	*)
+		echo "Usage: $0 [-h] [-p] [-m] [-M] [-f <file>] [-a <arg>]"
+		echo "  -h  Display this help message"
+		echo "  -p  Bump the version's patch number"
+		echo "  -m  Bump the version's minor number"
+		echo "  -M  Bump the version's major number"
+		echo "      you can't bump more than one places at a time"
+		echo "      without bumping you'll get the current version as output with suffix if used -a"
+		echo "  -f  Specify the version file to use, default is .version"
+		echo "  -a  Append the given argument to the version, default is nothing"
+		echo "  -i  Specify the initial version to use if no version file exists, defaults to 0.0.0"
+		exit 0
+		;;
+	esac
+done
+
+test -f "$file" || echo "$init_version" >"$file"
+
+grep -E "^[0-9]+\.[0-9]+\.[0-9]+$" "$file" >/dev/null || {
+	echo 1>&2 "Error: version file '$file' doesn't contain a valid version string"
+	exit 1
+}
+
+IFS=. read -r old_major old_minor old_patch <"$file"
+
+case "$bump" in
+patch)
+	new_patch=$((old_patch + 1))
+	new_minor="$old_minor"
+	new_major="$old_major"
+	echo "$new_major.$new_minor.$new_patch" >"$file"
+	;;
+minor)
+	new_patch=0
+	new_minor=$((old_minor + 1))
+	new_major="$old_major"
+	echo "$new_major.$new_minor.$new_patch" >"$file"
+	;;
+major)
+	new_patch=0
+	new_minor=0
+	new_major=$((old_major + 1))
+	echo "$new_major.$new_minor.$new_patch" >"$file"
+	;;
+*) ;;
+esac
+
+echo "$(cat "$file")$append"
